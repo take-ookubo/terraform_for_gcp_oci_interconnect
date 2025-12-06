@@ -16,13 +16,15 @@
 
 そこで Terraform を使って、**GCP Cloud Interconnect（Partner Interconnect）** と **OCI FastConnect** を組み合わせて、実際に動く Terraform コードを交えながら、GCP と OCI を接続する方法を解説していきます。
 
+---
+
 ### 前提となる知識
 
 この記事を読むにあたって、以下の知識があるとスムーズに理解できると思います！
 
 - **Terraform の基本操作**：`terraform apply` が使える
-- **GCP の基礎知識と管理者アカウント**：VPC、サブネット、ファイアウォールルールあたりがわかり、編集する権限が必要
-- **OCI の基礎知識と管理者アカウント**：VCN、サブネット、コンパートメントあたりがわかり、編集する権限が必要
+- **GCP の基礎知識と管理者アカウント**：Virtual Private Cloud(VPC)、サブネット、ファイアウォールルールあたりがわかり、編集する権限が必要
+- **OCI の基礎知識と管理者アカウント**：Virtual Cloud Network(VCN)、サブネット、コンパートメントあたりがわかり、編集する権限が必要
 - **ネットワークの基礎**：CIDR 表記、ルーティングの基本的な概念
 - **BGP の概要**：「ルーターが経路情報を交換するプロトコル」くらいの理解でOK
 
@@ -30,16 +32,28 @@
 
 ### 解説は飛ばして サクッと Terraform で動作させたい方向け
 
-こちらの github リポジトリにソースコードを載せてますので、
+[こちらの github リポジトリ](git@github.com:take-ookubo/terraform_for_gcp_oci_interconnect.git) にソースコードを載せてますので、git と terafform が動作する環境で、下記コマンドで実行できます。
 
 ```bash
 git clone git@github.com:take-ookubo/terraform_for_gcp_oci_interconnect.git
 cd terraform_for_gcp_oci_interconnect
+
 # variables.tf の値を各自の環境にあわせて変更する
 terraform init
 terraform plan
 terraform apply
 ```
+---
+
+## ⚠️ 重要：本構成は冗長構成ではありません
+
+**本記事で紹介する構成は、検証・学習目的のシングル構成です。**
+
+仮想専用線やパートナー設備に障害が発生した場合、本構成では **通信が完全に停止** します。
+本番環境では必ず冗長構成を `必ず` 検討してください！
+
+
+---
 
 #### GCP VLAN ペアリングキーを取得して OCI 側に設定する
 
@@ -58,7 +72,7 @@ TODO: 画面キャプチャで説明する
 
 まずは、全体像を図で見てみましょう。
 
-TODO: draw.io で図を用意
+![全体アーキテクチャ図](https://github.com/take-ookubo/terraform_for_gcp_oci_interconnect/blob/main/architecture_drawio.png?raw=true "画像タイトル")]
 
 ## 構築の流れ
 
@@ -221,20 +235,15 @@ BGP によって、「10.0.0.0/24 は GCP にある」「192.168.0.0/24 は OCI 
 
 ---
 
-## ⚠️ 重要：最後に本構成は冗長構成ではありません
-
-**本記事で紹介する構成は、検証・学習目的のシングル構成です。**
-
-専用線やパートナー設備に障害が発生した場合、本構成では **通信が完全に停止** します。
-本番環境では必ず冗長構成を検討してください。
-
----
-
 ## 参考リンク
+
+- [インターネットの本質から理解できるプロトコル「BGP」についてまとめた！](https://qiita.com/x5dwimpejx/items/2a84b3466c7b834d5853#bgp%E3%81%A3%E3%81%A6)
+※ BGP の概念は、物理ネットワーク経験者でもわかりづらいので、非常に参考になりました
+
+- [VLAN アタッチメント 設計完全ガイド](https://zenn.dev/cloud_ace/articles/vlan-attachment-how-to-planning)
+※ BGP の次に VLAN の概念がわかりづらいので、非常に参考になりました
+
+#### 各クラウドの公式ドキュメント
 
 - [GCP Partner Interconnect ドキュメント](https://cloud.google.com/network-connectivity/docs/interconnect/concepts/partner-overview)
 - [OCI FastConnect ドキュメント](https://docs.oracle.com/en-us/iaas/Content/Network/Concepts/fastconnect.htm)
-- [Terraform Google Provider](https://registry.terraform.io/providers/hashicorp/google/latest/docs)
-- [Terraform OCI Provider](https://registry.terraform.io/providers/oracle/oci/latest/docs)
-
-TODO もっと柔らかい記事探す
