@@ -6,6 +6,8 @@
 
 アップルワールドでは、B2B向けホテル予約サービスのデータベースに Oracle Cloud Infrastructure（OCI） の Oracle DB と、WEBサーバに Google Cloud Platform(GCP) を使用してるという、ちょっと特殊な構成だったりします。
 
+※ オンプレからクラウド移行した当時(2019年)は、 GCP 側に Oracle DB を構築する手段が、ライセンス的にベアメタルしか存在しなかったためこの構成でした。
+
 そんなニッチな構成ですが、  
 - 「マルチクラウドやってみたいけど、クラウド間の接続ってどうやるの？」
 - 「GCP と OCI 両方使ってるけど、プライベートネットワークで繋げたい...」
@@ -18,13 +20,13 @@
 
 ---
 
-### 前提となる知識
+### 前提となる知識・設定
 
 この記事を読むにあたって、以下の知識があるとスムーズに理解できると思います！
 
 - **Terraform の基本操作**：`terraform apply` が使える
-- **GCP の基礎知識と管理者アカウント**：Virtual Private Cloud(VPC)、サブネット、ファイアウォールルールあたりがわかり、編集する権限が必要
-- **OCI の基礎知識と管理者アカウント**：Virtual Cloud Network(VCN)、サブネット、コンパートメントあたりがわかり、編集する権限が必要
+- **GCP の基礎知識と管理者アカウント**：Virtual Private Cloud(VPC)、サブネット、ファイアウォールルールあたりがわかり、管理権限と、 gcloud コマンドで接続できてる事が必要
+- **OCI の基礎知識と管理者アカウント**：Virtual Cloud Network(VCN)、サブネット、コンパートメントあたりがわかり、管理権限と、 oci-cli コマンドで接続できてる事が必要
 - **ネットワークの基礎**：CIDR 表記、ルーティングの基本的な概念
 - **BGP の概要**：「ルーターが経路情報を交換するプロトコル」くらいの理解でOK
 
@@ -34,14 +36,42 @@
 
 [こちらの github リポジトリ](git@github.com:take-ookubo/terraform_for_gcp_oci_interconnect.git) にソースコードを載せてますので、git と terafform が動作する環境で、下記コマンドで実行できます。
 
+**重要： ペアリングキーを取得するため、2段階デプロイが必要です**
+
+GCP の VLAN Attachment で生成されるペアリングキーを OCI の Virtual Circuit に設定する必要があるため、Terraform を2回に分けて実行します。
+
 ```bash
+# NOTE: gcloud, oci-cli コマンドは事前に設定しておく
 git clone git@github.com:take-ookubo/terraform_for_gcp_oci_interconnect.git
 cd terraform_for_gcp_oci_interconnect
 
-# variables.tf の値を各自の環境にあわせて変更する
+# terraform.tfvars を各自の環境にあわせて修正する（gcp_pairing_key は空のまま）
+
+#===================================
+# 【第1段階】GCP リソースを作成
+#===================================
 terraform init
 terraform plan
 terraform apply
+# → GCP の VLAN Attachment と OCI の VCN/DRG が作成される
+# → OCI Virtual Circuit はまだ作成されない
+
+#===================================
+# 【第2段階】OCI Virtual Circuit を作成
+#===================================
+# ペアリングキーを取得
+terraform output gcp_interconnect_attachment_pairing_key
+# 出力例: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/asia-northeast1/2"
+
+# terraform.tfvars にペアリングキーを追加
+# gcp_pairing_key = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/asia-northeast1/2"
+
+# 再度適用
+terraform apply
+# → OCI Virtual Circuit が作成される
+
+# 検証終わったら削除する
+terraform destroy
 ```
 ---
 
@@ -52,12 +82,7 @@ terraform apply
 仮想専用線やパートナー設備に障害が発生した場合、本構成では **通信が完全に停止** します。
 本番環境では必ず冗長構成を `必ず` 検討してください！
 
-
 ---
-
-#### GCP VLAN ペアリングキーを取得して OCI 側に設定する
-
-TODO: 画面キャプチャで説明する
 
 ### 今回の構成のポイント
 
@@ -74,30 +99,50 @@ TODO: 画面キャプチャで説明する
 
 ![全体アーキテクチャ図](https://github.com/take-ookubo/terraform_for_gcp_oci_interconnect/blob/main/architecture_drawio.png?raw=true "画像タイトル")]
 
-## 構築の流れ
+## Terraform の構築の流れ
 
 実際に構築する場合の大まかな流れです。
 
-### Step 1: GCP 側の準備
+### なぜ2段階デプロイが必要なのか？
+
+GCP と OCI を接続するには、以下の依存関係があります：
+
+```
+GCP VLAN Attachment 作成
+        ↓
+  ペアリングキー発行
+        ↓
+OCI Virtual Circuit 作成（ペアリングキーが必要）
+```
+
+つまり、**GCP の VLAN Attachment を先に作成しないと、OCI の Virtual Circuit に必要なペアリングキーが手に入らない** んです。
+
+Terraform は通常すべてのリソースを一度に作成しようとしますが、このケースではペアリングキーという「実行時に初めて得られる値」が必要なため、2段階に分けて実行する必要があります。
+
+### Step 1: 第1段階 - GCP リソース + OCI 基盤の作成
+
+最初の `terraform apply` で以下が作成されます：
+
+**GCP 側：**
 1. VPC を作成
 2. サブネットを作成
 3. Cloud Router を作成
-4. VLAN Attachment を作成 → **ペアリングキーを取得**
+4. VLAN Attachment を作成 → **ペアリングキーが発行される**
 
-### Step 2: OCI 側の準備
+**OCI 側：**
 1. VCN を作成
 2. サブネットを作成
 3. DRG を作成
 4. DRG を VCN にアタッチ
-5. Virtual Circuit を作成
+5. ~~Virtual Circuit を作成~~ → **まだ作成しない**（ペアリングキーがないため）
 
-### Step 3: パートナー事業者での作業
-1. パートナーのポータルにログイン
-2. GCP のペアリングキーを入力
-3. OCI の Virtual Circuit と接続
-4. 接続を有効化
+### Step 2: 第2段階 - OCI Virtual Circuit の作成
 
-### Step 4: 接続確認
+1. `terraform output` でペアリングキーを取得
+2. `terraform.tfvars` にペアリングキーを設定
+3. 再度 `terraform apply` → **OCI Virtual Circuit が作成される**
+
+### Step 3: 接続確認
 1. GCP 側で VLAN Attachment のステータスを確認
 2. OCI 側で Virtual Circuit のステータスを確認
 3. 疎通テスト（ping など）
@@ -106,7 +151,63 @@ TODO: 画面キャプチャで説明する
 
 ## 各環境ごとの変数の更新
 
-TODO: variables.tf 更新の説明
+Terraform を実行する前に、`terraform.tfvars` ファイルを編集して、各自の環境に合わせた値を設定する必要があります。
+
+### 設定が必要な変数
+
+#### GCP の設定（必須）
+
+| 変数名 | 説明 | 確認方法 |
+|--------|------|----------|
+| `gcp_project_id` | GCP プロジェクト ID | GCP コンソール → プロジェクト選択 |
+
+#### OCI の設定（必須）
+
+| 変数名 | 説明 | 確認方法 |
+|--------|------|----------|
+| `oci_tenancy_ocid` | テナンシー OCID | OCI コンソール → Profile → Tenancy |
+| `oci_compartment_id` | コンパートメント OCID | OCI コンソール → Identity → Compartments |
+| `oci_user_ocid` | ユーザー OCID | OCI コンソール → Profile → User Settings |
+| `oci_fingerprint` | API キーのフィンガープリント | OCI コンソール → Profile → API Keys |
+| `oci_private_key_path` | API プライベートキーのパス | ローカルに保存したキーのフルパス |
+
+#### 2段階デプロイ用の設定
+
+| 変数名 | 説明 | 設定タイミング |
+|--------|------|----------------|
+| `gcp_pairing_key` | GCP VLAN Attachment のペアリングキー | **第2段階で設定** |
+
+### terraform.tfvars の設定例
+
+```hcl
+# =============================================================================
+# GCP Variables
+# =============================================================================
+gcp_project_id = "YOUR-GCP-PROJECT-ID"
+
+# =============================================================================
+# OCI Variables
+# =============================================================================
+oci_tenancy_ocid     = "ocid1.tenancy.oc1..aaaaaaaxxxxxxxxxx"
+oci_compartment_id   = "ocid1.compartment.oc1..aaaaaaaxxxxxxxxxx"
+oci_user_ocid        = "ocid1.user.oc1..aaaaaaaxxxxxxxxxx"
+oci_fingerprint      = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+oci_private_key_path = "/home/user/.oci/oci_api_key.pem"
+
+# =============================================================================
+# 2段階デプロイ用（第1段階では空のまま）
+# =============================================================================
+# 第1段階の terraform apply 完了後、出力されたペアリングキーを設定
+# gcp_pairing_key = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/asia-northeast1/2"
+```
+
+### ペアリングキーの設定手順
+
+1. **第1段階**: `gcp_pairing_key` は設定せずに `terraform apply` を実行
+2. **ペアリングキーを取得**: `terraform output gcp_interconnect_attachment_pairing_key`
+3. **第2段階**: 取得したキーを `terraform.tfvars` に設定して再度 `terraform apply`
+
+---
 
 ## 各コンポーネントを詳しく解説
 

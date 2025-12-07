@@ -14,6 +14,6 @@ output "drg_id" {
 }
 
 output "virtual_circuit_id" {
-  description = "FastConnect Virtual Circuit OCID"
-  value       = oci_core_virtual_circuit.virtual_circuit.id
+  description = "FastConnect Virtual Circuit OCID（第2段階で作成）"
+  value       = length(oci_core_virtual_circuit.virtual_circuit) > 0 ? oci_core_virtual_circuit.virtual_circuit[0].id : null
 }

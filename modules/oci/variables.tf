@@ -27,3 +27,8 @@ variable "fastconnect_port_speed" {
   description = "FastConnect ポート速度"
   type        = string
 }
+
+variable "gcp_pairing_key" {
+  description = "GCP VLAN Attachment のペアリングキー"
+  type        = string
+}

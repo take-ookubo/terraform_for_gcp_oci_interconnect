@@ -122,17 +122,49 @@ GCP と OCI の両方に対応している主なパートナー:
 │       └── fastconnect.tf
 ```
 
-## 使用方法
+## 使用方法（2段階デプロイ）
+
+GCP と OCI の接続には、GCP 側で生成されるペアリングキーを OCI 側に設定する必要があるため、Terraform を2段階で実行します。
+
+### 第1段階：GCP リソースの作成
 
 ```bash
 # 初期化
 terraform init
 
+# terraform.tfvars を作成（gcp_pairing_key は空のまま）
+cp terraform.tfvars.example terraform.tfvars
+# 各自の環境に合わせて値を編集
+
 # プラン確認
 terraform plan
 
-# 適用
+# 適用（GCP リソース + OCI の VCN/DRG が作成される）
 terraform apply
+```
+
+この段階で以下が作成されます：
+- GCP: VPC、サブネット、Cloud Router、Partner Interconnect (VLAN Attachment)
+- OCI: VCN、サブネット、DRG、DRG Attachment
+- OCI Virtual Circuit は**まだ作成されません**
+
+### 第2段階：OCI Virtual Circuit の作成
+
+```bash
+# ペアリングキーを取得
+terraform output gcp_interconnect_attachment_pairing_key
+
+# terraform.tfvars にペアリングキーを追加
+# gcp_pairing_key = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/asia-northeast1/2"
+
+# 再度適用（OCI Virtual Circuit が作成される）
+terraform apply
+```
+
+### リソースの削除
+
+```bash
+terraform destroy
 ```
 
 ## 注意事項
@@ -146,4 +178,3 @@ terraform apply
 
 - [GCP Partner Interconnect](https://cloud.google.com/network-connectivity/docs/interconnect/concepts/partner-overview)
 - [OCI FastConnect](https://docs.oracle.com/en-us/iaas/Content/Network/Concepts/fastconnect.htm)
-- [Equinix Fabric](https://www.equinix.com/interconnection-services/equinix-fabric)

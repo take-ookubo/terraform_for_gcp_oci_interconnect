@@ -75,7 +75,7 @@ variable "oci_vcn_cidr" {
 variable "oci_vcn_name" {
   description = "OCI VCN 名"
   type        = string
-  default     = "oci-gcp-vcn"
+  default     = "default"
 }
 
 # =============================================================================
@@ -97,11 +97,17 @@ variable "partner_interconnect_edge_availability_domain" {
 variable "fastconnect_provider_name" {
   description = "FastConnect プロバイダー名"
   type        = string
-  default     = "Equinix"
+  default     = "Google Cloud"
 }
 
 variable "fastconnect_port_speed_shape" {
   description = "FastConnect ポート速度"
   type        = string
   default     = "1 Gbps"
+}
+
+variable "gcp_pairing_key" {
+  description = "GCP VLAN Attachment のペアリングキー（第2段階で設定するので空のまま）"
+  type        = string
+  default     = ""
 }

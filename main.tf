@@ -27,4 +27,7 @@ module "oci" {
   vcn_name                 = var.oci_vcn_name
   fastconnect_provider     = var.fastconnect_provider_name
   fastconnect_port_speed   = var.fastconnect_port_speed_shape
+  gcp_pairing_key          = var.gcp_pairing_key  # 第2段階で terraform.tfvars に設定
+
+  depends_on = [module.gcp]
 }
