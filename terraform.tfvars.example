@@ -1,0 +1,45 @@
+# =============================================================================
+# GCP Variables
+# =============================================================================
+
+gcp_project_id = "YOUR-GCP-PROJECT-ID"
+
+# =============================================================================
+# OCI Variables
+# =============================================================================
+
+# OCI テナンシー OCID
+# OCI コンソール → Profile → Tenancy で確認
+oci_tenancy_ocid = "ocid1.tenancy.oc1..xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# OCI コンパートメント OCID
+# OCI コンソール → Identity → Compartments で確認
+oci_compartment_id = "ocid1.compartment.oc1..xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# OCI ユーザー OCID
+# OCI コンソール → Profile → User Settings で確認
+oci_user_ocid = "ocid1.user.oc1..xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# OCI API キーのフィンガープリント
+# OCI コンソール → Profile → User Settings → API Keys で確認
+oci_fingerprint = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+
+# OCI API プライベートキーのパス
+# 注意: ~ は展開されないのでフルパスを使用
+oci_private_key_path = "~/.oci/user_oci_api_key.pem"
+
+# =============================================================================
+# Interconnect Variables（2段階デプロイ）
+# =============================================================================
+#
+# 【第1段階】GCP リソースを作成（gcp_pairing_key は空のまま）
+#   $ terraform apply
+#   → 出力される gcp_interconnect_attachment_pairing_key をコピー
+#
+# 【第2段階】ペアリングキーを設定して OCI Virtual Circuit を作成
+#   下記の gcp_pairing_key のコメントを外し、コピーした値を設定
+#   $ terraform apply
+#
+# GCP VLAN Attachment のペアリングキー
+# 第1段階の terraform apply 完了後に出力される値を設定
+# gcp_pairing_key = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/asia-northeast1/2"
