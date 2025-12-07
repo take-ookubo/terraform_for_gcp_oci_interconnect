@@ -34,7 +34,7 @@
 
 ### 解説は飛ばして サクッと Terraform で動作させたい方向け
 
-[こちらの github リポジトリ](git@github.com:take-ookubo/terraform_for_gcp_oci_interconnect.git) にソースコードを載せてますので、git と terafform が動作する環境で、下記コマンドで実行できます。
+[こちらの github リポジトリ](git@github.com:take-ookubo/terraform_for_gcp_oci_interconnect.git) にソースコードを載せてますので、git と terraform が動作する環境で、下記コマンドで実行できます。
 
 **重要： ペアリングキーを取得するため、2段階デプロイが必要です**
 
@@ -45,7 +45,8 @@ GCP の VLAN Attachment で生成されるペアリングキーを OCI の Virtu
 git clone git@github.com:take-ookubo/terraform_for_gcp_oci_interconnect.git
 cd terraform_for_gcp_oci_interconnect
 
-# terraform.tfvars を各自の環境にあわせて修正する（gcp_pairing_key は空のまま）
+# example からコピーして terraform.tfvars を各自の環境にあわせて修正する（gcp_pairing_key は空のまま）
+cp terraform.tfvars.example terraform.tfvars
 
 #===================================
 # 【第1段階】GCP リソースを作成
@@ -61,10 +62,10 @@ terraform apply
 #===================================
 # ペアリングキーを取得
 terraform output gcp_interconnect_attachment_pairing_key
-# 出力例: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/asia-northeast1/2"
+# 出力例: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/asia-northeast1/1"
 
 # terraform.tfvars にペアリングキーを追加
-# gcp_pairing_key = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/asia-northeast1/2"
+# gcp_pairing_key = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/asia-northeast1/1"
 
 # 再度適用
 terraform apply
@@ -73,6 +74,7 @@ terraform apply
 # 検証終わったら削除する
 terraform destroy
 ```
+
 ---
 
 ## ⚠️ 重要：本構成は冗長構成ではありません
@@ -97,7 +99,7 @@ terraform destroy
 
 まずは、全体像を図で見てみましょう。
 
-![全体アーキテクチャ図](https://github.com/take-ookubo/terraform_for_gcp_oci_interconnect/blob/main/architecture_drawio.png?raw=true "画像タイトル")]
+![全体アーキテクチャ図](https://github.com/take-ookubo/terraform_for_gcp_oci_interconnect/blob/main/architecture_drawio.png?raw=true)
 
 ## Terraform の構築の流れ
 
@@ -198,7 +200,7 @@ oci_private_key_path = "/home/user/.oci/oci_api_key.pem"
 # 2段階デプロイ用（第1段階では空のまま）
 # =============================================================================
 # 第1段階の terraform apply 完了後、出力されたペアリングキーを設定
-# gcp_pairing_key = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/asia-northeast1/2"
+# gcp_pairing_key = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx/asia-northeast1/1"
 ```
 
 ### ペアリングキーの設定手順
@@ -250,7 +252,7 @@ resource "google_compute_interconnect_attachment" "partner_interconnect" {
 
 ---
 
-### OCI 側のコンポーネント
+### OCI 側で肝になるコンポーネント
 
 #### 1. DRG（Dynamic Routing Gateway）
 
